@@ -4,6 +4,10 @@ import json
 from uuid import uuid4
 from Card import Card, is_valid_move
 from Node import Node
+import logging
+lg = logging.getLogger(__name__)
+lg.setLevel("INFO")
+
 
 URL = "https://unoserver20210524144013.azurewebsites.net/api/"
 headers = {
@@ -63,16 +67,18 @@ class Player:
         root.set_estimation()
 
         lvl_1 = []
+        lg.info("lvl1 cards")
         for card in self.hand:
             current_hand = self.hand
             current_hand.remove(card)
             if is_valid_move(current_card, card):
                 n = Node(current_hand, deck, card, root, 1, root.estimation)
                 n.set_estimation()
+                print(f"{current_card}")
                 lvl_1.append(n)
                 root.children.append(n)
-                print(f"lvl_1 cards {' | '.join(lvl_1)}")
         lvl_2 = []
+        lg.info("lvl1 cards")
         for node in lvl_1:
             for card in deck:
                 current_deck = deck
@@ -80,11 +86,12 @@ class Player:
                 if is_valid_move(node.top, card):
                     n = Node(hand=current_deck, deck=node.hand, top=card, parent=node, lvl=2, estimation=node.estimation)
                     n.set_estimation()
+                    print(f"{card}")
                     lvl_2.append(n)
                     node.children.append(n)
-                    print(f"lvl_2 cards {' | '.join(lvl_2)}")
 
         cards = [get_max_estimation_card(lvl_2) if len(lvl_2) > 0 else []]
+        lg.info(f"max estimated cards: {cards}")
         try:
             if cards[0].type == 4 or cards[0].type == 5:
                 current_color = get_max_valuable_color(self.hand)
@@ -100,22 +107,25 @@ class Player:
                 cards.append(card)
                 self.hand.remove(card)
 
-    def send_cards(self, cards, match_id, color):
+    def send_cards(self, cards, match_id, color, local: bool = False):
         sending_cards = []
-        for card in cards:
-            sending_cards.append(card.to_json())
-        requests.post(
-            URL + "Game/move",
-            data=json.dumps(
-                {
-                    "token": self._token,
-                    "matchId": match_id,
-                    "cards": sending_cards,
-                    "color": color,
-                }
-            ),
-            headers=headers,
-        )
+        if not local:
+            for card in cards:
+                sending_cards.append(card.to_json())
+            requests.post(
+                URL + "Game/move",
+                data=json.dumps(
+                    {
+                        "token": self._token,
+                        "matchId": match_id,
+                        "cards": sending_cards,
+                        "color": color,
+                    }
+                ),
+                headers=headers,
+            )
+        else:
+            pass
 
 
 def get_max_estimation_card(leafs):
