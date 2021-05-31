@@ -1,6 +1,10 @@
 import requests
 import json
-from Card import Card, Color
+
+from typing import List
+
+import Player
+from Card import Card, Color, is_valid_move
 import random
 from uuid import uuid4
 
@@ -50,54 +54,74 @@ class Game:
         self.player = player
         self.opponent = opponent
         self.current_card = None
-        self.__match_id = None
+        self.match_id = str(uuid4())
         self.status = 0
         self.current_color = 0
+        self.move_id = player.id
+        self.history = []
 
-    def start(self, local: bool = False):
-        if not local:
-            req = requests.post(
-                URL + "Match/start",
-                data=json.dumps(
-                    {"token": self.player.get_token(), "opponent": self.opponent}
-                ),
-                headers=headers,
-            )
-            self.__match_id = req.json()["matchId"]
-        else:
-            self.__match_id = str(uuid4())
-
-    def get_board(self, local: bool = False):
-        if self.__match_id is not None:
-            if not local:
-                req = requests.get(
-                    URL + "Game/board",
-                    params={"token": self.player.get_token(), "matchId": self.__match_id},
-                )
-                board = req.json()
-                self.current_card = Card(board["currentCard"])
-            else:
-                self.current_card = self.deck[random.randint(0, 107)]
-
-            try:
-                self.deck.remove(self.current_card)
-            except ValueError:
-                pass
+    def pick_card(self, first: bool = False):
+        deck_cards_left = len(self.deck)
+        print(f"Deck cards left: {deck_cards_left}")
+        if deck_cards_left == 0:
+            print("FULLFIL DECK WITH HISTORY")
+            self.deck = self.history
+            self.history = []
+        picked_card = self.deck[random.randint(0, len(self.deck)-1)]
+        try:
+            self.deck.remove(picked_card)
+            self.history.append(picked_card)
             self.current_deck = self.deck
-            self.player.set_hand(board["hand"])
-            for card in self.player.get_hand():
-                try:
-                    self.current_deck.remove(card)
-                except ValueError:
-                    pass
-            self.status = board["status"]
-            self.player.move = board["myMove"]
-            self.current_color = board["currentColor"]
-        else:
-            print("Match not started")
+            if first:
+                self.current_card = picked_card
+                self.current_color = picked_card.color
+            else:
+                return picked_card
+        except Exception as e:
+            print(e)
 
-    def verify_move(self, card: Card):
-        pass
+    def step(self, player: Player, passive_player: Player, cards: List[Card], color):
+        card_to_beat = self.current_card
+        # process case where card_to_beat is None
+        self.move_id = passive_player.id
+        if cards:
+            # Card can be beaten
+            self.current_card = cards[0]
+            self.current_color = color
+            # picked_card = self.pick_card()
+            # player.hand.append(picked_card)
+        else:
+            print(f"Can't beat {card_to_beat.__str__()} with hand cards.")
+            # Analyze card which cannot be beaten
+            picked_card = self.pick_card()
+            print(f"Picking: {picked_card.__str__()}")
+            beaten = is_valid_move(card_to_beat, picked_card)
+            if beaten:
+                print(f"Card Changed: {card_to_beat.__str__()} -> {picked_card.__str__()}")
+                self.current_card = picked_card
+                self.current_color = picked_card.color
+            else:
+                print(f"Can't beat {card_to_beat.__str__()}")
+                player.hand.append(picked_card)
+                if card_to_beat.type == 2:
+                    # «Пропусти ход» — следующий игрок пропускает свой ход
+                    self.move_id = player.id
+                    # Reset card type to process infinite loop
+                    self.current_card.type = 0
+                elif card_to_beat.type == 3:
+                    print("Picking 1 more card")
+                    picked_card = self.pick_card()
+                    player.hand.append(picked_card)
+                    # Reset card type to process infinite loop
+                    self.current_card.type = 0
+                elif card_to_beat.type == 4:
+                    print("Picking 3 more cards")
+                    for i in range(3):
+                        picked_card = self.pick_card()
+                        player.hand.append(picked_card)
+                    # Reset card type to process infinite loop
+                    self.current_card.type = 0
+
 
     def get_match_id(self):
-        return self.__match_id
+        return self.match_id

@@ -18,6 +18,36 @@ class Color(enum.Enum):
 
 
 def is_valid_move(top, card):
+    if (top.color == card.color) and (top.type in [0, 1]):
+        # Направление хода меняется на противоположное.
+        # Следующий игрок все равно играет
+        return True
+    if (top.type == 0 and card.type == 0) and (top.number_value == card.number_value or top.color == card.color):
+        # Обычная карта имеет ту же цифру, или ту же картинку
+        return True
+    elif top.type == 2:
+        # «Пропусти ход» — следующий игрок пропускает свой ход
+        return False
+    elif top.type == card.type and top.type == 3:
+        # «Возьми две» — следующий игрок берёт из колоды «Прикуп»
+        # две карты (в тёмную) и пропускает свой ход.
+        # Игрок может «спастись» от действия этой карты
+        # выложив свою карту «Возьми две» (цвет может быть любой).
+        return True
+    elif top.type == 5 and top.color == card.color:
+        # «Закажи цвет» — позволяет поменять игроку текущий цвет
+        # (на любой, в том числе и на текущий цвет).
+        # Следующий игрок должен положить любую карту заданного цвета.
+        return True
+    elif top.type == 4 and card.type == 2 and top.color == card.color:
+        # «спастись» от действия этой карты только выложив карту
+        # «Возьми две» нового заказанного цвета
+        return True
+    else:
+        return False
+
+
+def is_valid_move1(top, card):
     if top.color == card.color:
         return True
     if (top.type == 0 and card.type == 0) and (top.number_value == card.number_value):
